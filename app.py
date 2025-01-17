@@ -1,68 +1,64 @@
 import streamlit as st
-import pandas as pd
-import mplfinance as mpf
-from datetime import datetime
+import yfinance as yf
+import plotly.graph_objects as go
 
-# Streamlit Configuration
-st.set_page_config(layout="wide", page_title="Candlestick Chart App")
+# Streamlit App Title
+st.title("Investment Strategy Dashboard")
 
-# Load and preprocess the dataset
-@st.cache_data
-def load_dataset():
-    df = pd.read_csv("data.csv")
-    df["Data"] = pd.to_datetime(df["Data"], format="%m/%d/%Y")  # Convert 'Data' column to datetime
-    df.set_index("Data", inplace=True)  # Set 'Data' as index
-    return df
+# Sidebar for User Input
+st.sidebar.header("Select Assets")
+assets = ["XAU/USD (Gold)", "CL1 (Crude Oil)", "DXY (Dollar Index)"]
+selected_assets = st.sidebar.multiselect("Choose assets to view:", assets, default=assets)
 
-data = load_dataset()
+# Mapping asset names to Yahoo Finance tickers
+asset_tickers = {
+    "XAU/USD (Gold)": "GC=F",
+    "CL1 (Crude Oil)": "CL=F",
+    "DXY (Dollar Index)": "DX-Y.NYB"
+}
 
-# Sidebar Inputs
-st.sidebar.header("Candlestick Chart Configuration")
+# Fetch and Display Real-Time Data
+def fetch_data(ticker):
+    try:
+        data = yf.Ticker(ticker)
+        hist = data.history(period="1mo")
+        return hist
+    except Exception as e:
+        st.error(f"Error fetching data for {ticker}: {e}")
+        return None
 
-# Date Selection
-start_date = st.sidebar.date_input("Start Date", value=datetime(2000, 1, 1))
-end_date = st.sidebar.date_input("End Date", value=datetime(2000, 12, 31))
+# Display Charts for Selected Assets
+for asset in selected_assets:
+    ticker = asset_tickers[asset]
+    st.subheader(f"{asset} - Real-Time Chart")
 
-# Plot Style
-plot_styles = ["classic", "charles", "yahoo", "mike", "nightclouds", "sas"]
-plot_style = st.sidebar.selectbox("Select Chart Style", plot_styles, index=3)
+    # Fetch historical data
+    data = fetch_data(ticker)
 
-# Volume Display Toggle
-show_volume = st.sidebar.checkbox("Show Volume", value=False)
+    if data is not None:
+        # Create a Plotly figure
+        fig = go.Figure()
+        fig.add_trace(go.Candlestick(
+            x=data.index,
+            open=data['Open'],
+            high=data['High'],
+            low=data['Low'],
+            close=data['Close'],
+            name=asset
+        ))
+        fig.update_layout(
+            title=f"{asset} Price Movements",
+            xaxis_title="Date",
+            yaxis_title="Price",
+            template="plotly_dark"
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-# Filter data based on user inputs
-filtered_data = data.loc[start_date:end_date]
+    # Display latest price
+    ticker_data = yf.Ticker(ticker)
+    current_price = ticker_data.history(period="1d")["Close"][-1]
+    st.metric(label=f"{asset} Current Price", value=f"{current_price:.2f}")
 
-# Mock Open, High, Low, Close columns (since they are missing)
-if not filtered_data.empty:
-    filtered_data["Open"] = filtered_data["XAU BGNL"] * 0.98  # Mock Open as 98% of Close
-    filtered_data["High"] = filtered_data["XAU BGNL"] * 1.02  # Mock High as 102% of Close
-    filtered_data["Low"] = filtered_data["XAU BGNL"] * 0.97   # Mock Low as 97% of Close
-    filtered_data["Close"] = filtered_data["XAU BGNL"]        # Use 'XAU BGNL' as Close
-
-    # Columns required for candlestick
-    ohlc = filtered_data[["Open", "High", "Low", "Close"]]
-
-    # Plot Candlestick Chart using mplfinance
-    st.title(":green[Candlestick] :red[Chart]")
-    st.subheader("Custom Dataset Candlestick Chart")
-
-    fig, axlist = mpf.plot(
-        ohlc,
-        type="candle",
-        style=plot_style,
-        volume=show_volume,
-        title="Candlestick Chart",
-        ylabel="Price",
-        ylabel_lower="Volume",
-        returnfig=True
-    )
-
-    # Display the chart in Streamlit
-    st.pyplot(fig)
-else:
-    st.error("No data available for the selected date range.")
-
-# Display Raw Data
-if st.checkbox("Show Raw Data"):
-    st.write(filtered_data)
+# Footer
+st.write("---")
+st.write("Made with 💜 by Hewan")
