@@ -5,7 +5,6 @@ import numpy as np
 import joblib
 import requests
 
-
 # Load Isolation Forest Model
 model_path = "isolation_forest_model.pkl"
 try:
@@ -66,9 +65,8 @@ if data is not None:
     st.plotly_chart(fig, use_container_width=True)
 
     # Display latest price
-    ticker_data = yf.Ticker(ticker)
     try:
-        current_price = ticker_data.history(period="1d")["Close"][-1]
+        current_price = data['Close'][-1]  # Access the latest price from the fetched data
         st.metric(label=f"{selected_asset} Current Price", value=f"{current_price:.2f}")
     except IndexError:
         st.error("Unable to fetch real-time price.")
@@ -83,7 +81,7 @@ if option == "Enter Custom Value":
     custom_value = st.number_input(f"Enter a custom value for {selected_asset}:", value=20.0, step=0.1)
 else:
     if data is not None:
-        custom_value = current_price
+        custom_value = current_price  # Use the correctly accessed current_price
     else:
         st.warning("No real-time value available. Please enter a custom value.")
         custom_value = None
